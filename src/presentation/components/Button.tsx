@@ -26,9 +26,16 @@ interface ButtonRootProps {
   onPress: () => void;
   variant?: Variant;
   loading?: boolean;
+  testID?: string;
 }
 
-function ButtonRoot({ children, onPress, variant = 'primary', loading = false }: ButtonRootProps) {
+function ButtonRoot({
+  children,
+  onPress,
+  variant = 'primary',
+  loading = false,
+  testID,
+}: ButtonRootProps) {
   const value = useMemo(() => ({ loading, variant }), [loading, variant]);
   const isPrimary = variant === 'primary';
 
@@ -37,6 +44,7 @@ function ButtonRoot({ children, onPress, variant = 'primary', loading = false }:
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: loading }}
+        testID={testID}
         disabled={loading}
         onPress={onPress}
         style={({ pressed }) => [

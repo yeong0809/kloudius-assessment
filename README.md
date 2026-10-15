@@ -144,20 +144,31 @@ Worth stating plainly rather than leaving to be discovered:
 ## Tests
 
 ```sh
-npm test
+npm test         # 64 unit and integration tests
+npm run e2e:build   # build the app for Detox
+npm run e2e:test    # run the Detox E2E suite against the simulator
 ```
 
-Three suites, 28 tests:
+Six Jest suites, 64 tests:
 
-- `__tests__/domain.test.ts` — email validation and normalization, password policy, `User`
-- `__tests__/application.test.ts` — the use cases, against in-memory repositories
-- `__tests__/App.test.tsx` — a full signup → logout → login round trip through the real
-  screens and navigator
+| Suite | Tests | Covers |
+|---|---|---|
+| `__tests__/domain.test.ts` | 11 | email validation and normalization, password policy, `User` |
+| `__tests__/application.test.ts` | 13 | every signup/login/logout failure path against in-memory repositories |
+| `__tests__/hashing.test.ts` | 12 | `Sha256PasswordHasher` — determinism, salt separation, delimiter, verify |
+| `__tests__/storage.test.ts` | 16 | Keychain and AsyncStorage adapters — round trips, normalization, corrupt data |
+| `__tests__/App.test.tsx` | 4 | signup → logout → login round trip against in-memory repositories |
+| `__tests__/persistence.test.tsx` | 7 | the same flows against the **real** AsyncStorage and Keychain adapters |
 
-The domain and application suites need no mocks at all.
-[`src/infrastructure/memory/`](src/infrastructure/memory/) holds real working
-implementations of the repository interfaces, which is also the proof that the domain
-depends on interfaces rather than on storage.
+The domain and application suites need no mocks at all — that is the payoff of the ports.
+`src/infrastructure/memory/` holds real working implementations of the repository
+interfaces, which is also the proof that the domain depends on interfaces rather than on
+storage.
+
+`persistence.test.tsx` is the one that closes the gap that unit tests alone leave open: it
+runs the real composition root and asserts that a cold start restores the session from the
+Keychain, that a stored credential rejects a wrong password, and that no plaintext password
+is ever written to either store.
 
 Other checks:
 
@@ -165,6 +176,23 @@ Other checks:
 npx tsc --noEmit
 npm run lint
 ```
+
+### End-to-end tests
+
+[`e2e/auth.e2e.js`](e2e/auth.e2e.js) drives the app on a real simulator through
+[Detox](https://w3c.github.io/detox/): cold start, signup, logout, login, session restore
+across an app relaunch, the wrong-password error, the short-password error, and the
+password toggle.
+
+These require a machine with a desktop session — Detox needs to interact with the
+simulator, so they cannot run over plain SSH or in a headless CI container without a
+virtual display.
+
+> **Known state:** four of the six flows pass reliably here. The two that perform a full
+> signup → logout → login cycle in a single test are flaky on a loaded machine — one run
+> took 147 seconds — and time out waiting for the Home screen rather than reporting an app
+> defect. The individual steps they combine all pass on their own. Re-run them on an idle
+> machine before trusting the result.
 
 ## Implementation notes
 

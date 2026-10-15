@@ -1,5 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
@@ -9,28 +16,39 @@ export function HomeScreen() {
   const { user, logout } = useAuth();
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.greeting}>Welcome</Text>
-        <Text style={styles.name} testID="home-name">
-          {user?.name}
-        </Text>
-        <Text style={styles.email} testID="home-email">
-          {user?.email}
-        </Text>
-      </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.flex}>
+      {/* Scrollable so the Logout button stays reachable when a software keyboard is
+          open on a short device. */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <Text style={styles.greeting}>Welcome</Text>
+          <Text style={styles.name} testID="home-name">
+            {user?.name}
+          </Text>
+          <Text style={styles.email} testID="home-email">
+            {user?.email}
+          </Text>
+        </View>
 
-      <Button variant="secondary" onPress={logout}>
-        <Button.Label>Logout</Button.Label>
-      </Button>
-    </View>
+        <Button testID="logout-button" variant="secondary" onPress={logout}>
+          <Button.Label>Logout</Button.Label>
+        </Button>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  flex: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  container: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.lg,
   },
