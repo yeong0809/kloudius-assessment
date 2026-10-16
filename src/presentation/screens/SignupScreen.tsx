@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { Field } from '../components/Field';
 import { PasswordInput } from '../components/PasswordInput';
 import { Button } from '../components/Button';
+import { authErrorMessages } from './authErrorMessages';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import type { RootStackParamList } from '../navigation/types';
@@ -30,15 +31,16 @@ export function SignupScreen({ navigation }: Props) {
 
   async function handleSubmit() {
     const local: FieldErrors = {};
+    const required = authErrorMessages['missing-fields'];
     if (!name.trim() || !email.trim() || !password) {
       if (!name.trim()) {
-        local.name = 'All fields are required.';
+        local.name = required;
       }
       if (!email.trim()) {
-        local.email = 'All fields are required.';
+        local.email = required;
       }
       if (!password) {
-        local.password = 'All fields are required.';
+        local.password = required;
       }
       setErrors(local);
       return;

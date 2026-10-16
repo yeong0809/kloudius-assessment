@@ -19,7 +19,7 @@ npm start                    # Metro
 npm run ios                  # iOS simulator
 npm run android              # Android emulator
 npm test                     # Jest
-npx tsc --noEmit             # typecheck
+npm run typecheck          # tsc --noEmit
 npm run lint                 # ESLint
 ```
 
@@ -54,9 +54,9 @@ AsyncStorage. If a domain file needs a type from outside `domain`, that type pro
 belongs in the domain. This is what makes the auth logic testable with no simulator and no
 native mocks — do not erode it.
 
-Keep concrete construction in the composition root (`createAuthService.ts`). That is the
-one place that knows the adapters; `AuthContext` and the use cases must not import from
-`infrastructure`.
+Keep concrete construction in the composition root (`createAuthService.ts`), which `App.tsx`
+calls and hands to `AuthProvider` as a prop. `App.tsx` is the only place that names an
+adapter; `AuthContext` and the use cases must not import from `infrastructure`.
 
 ## Conventions
 

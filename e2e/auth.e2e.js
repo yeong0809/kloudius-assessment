@@ -1,7 +1,48 @@
 const { by, element, expect, device, waitFor } = require('detox');
+const { execSync } = require('child_process');
+const os = require('os');
+const path = require('path');
 
 const EMAIL = 'e2e.user@example.com';
 const PASSWORD = 'secret123';
+
+// iOS AutoFill raises system sheets the tests cannot survive: "Use Strong Password?" the
+// moment an empty password field takes focus, and "Save Password?" once a signup
+// succeeds. Both are SpringBoard UI, so Detox can neither see nor dismiss them, and they
+// sit on top of the submit and logout buttons — taps land on the sheet and fail with
+// "View is not hittable". Detox has no API for this; the documented workaround
+// (wix/Detox#3761) is to turn AutoFill off in the simulator's configuration profiles.
+//
+// The equivalent manual step is Settings -> General -> AutoFill & Passwords -> turn
+// AutoFill Passwords off.
+function disablePasswordAutoFill() {
+  const base = path.join(
+    os.homedir(),
+    'Library',
+    'Developer',
+    'CoreSimulator',
+    'Devices',
+    device.id,
+    'data',
+  );
+  const profiles = [
+    'Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist',
+    'Library/UserConfigurationProfiles/EffectiveUserSettings.plist',
+    'Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist',
+  ];
+
+  for (const profile of profiles) {
+    try {
+      execSync(
+        `plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO "${path.join(base, profile)}"`,
+        { stdio: 'ignore' },
+      );
+    } catch (error) {
+      // A profile that is missing or shaped differently on a future iOS must not fail the
+      // run before any test has reported something useful.
+    }
+  }
+}
 
 // Screens must be seeded to a known state: the Keychain and AsyncStorage survive an app
 // restart, so a leftover account would make a "duplicate email" or "wrong password"
@@ -10,9 +51,6 @@ async function resetAppState() {
   await device.launchApp({
     newInstance: true,
     delete: true,
-    launchArgs: {
-      detoxEnableSynchronization: 1,
-    },
   });
 }
 
@@ -35,6 +73,7 @@ async function fillSignup(name, email, password) {
 
 describe('Authentication flow', () => {
   beforeAll(async () => {
+    disablePasswordAutoFill();
     await resetAppState();
   });
 

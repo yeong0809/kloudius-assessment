@@ -1,14 +1,13 @@
 export const MIN_PASSWORD_LENGTH = 6;
 
-export function validatePassword(raw: string): { valid: boolean; error?: string } {
+// Returns the failure kind a password maps to, or null when it is acceptable. The domain
+// names the problem and stops there; authErrorMessages owns the wording.
+export function validatePassword(raw: string): 'missing-fields' | 'weak-password' | null {
   if (raw.length === 0) {
-    return { valid: false, error: 'Password is required.' };
+    return 'missing-fields';
   }
   if (raw.length < MIN_PASSWORD_LENGTH) {
-    return {
-      valid: false,
-      error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
-    };
+    return 'weak-password';
   }
-  return { valid: true };
+  return null;
 }

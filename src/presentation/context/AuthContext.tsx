@@ -4,7 +4,6 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { AuthService } from '../../application/auth';
@@ -13,7 +12,6 @@ import {
   AuthResult,
   UserProfile,
 } from '../../domain/auth';
-import { createAuthService } from '../../infrastructure/createAuthService';
 import { authErrorMessages } from '../screens/authErrorMessages';
 
 type FieldName = 'name' | 'email' | 'password';
@@ -43,18 +41,23 @@ function toFieldErrors(result: AuthResult<unknown>): FieldErrors {
   return field ? { [field]: message } : { password: message };
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const serviceRef = useRef<AuthService | null>(null);
-  if (serviceRef.current === null) {
-    serviceRef.current = createAuthService();
-  }
-
+// The service arrives as a prop rather than being constructed here: the context is
+// presentation, and construction belongs to the composition root (App.tsx). That keeps
+// this layer free of any infrastructure import.
+export function AuthProvider({
+  service,
+  children,
+}: {
+  service: AuthService;
+  children: React.ReactNode;
+}) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    serviceRef.current!.restore()
+    service
+      .restore()
       .then(result => {
         if (active && result.ok && result.value) {
           setUser(result.value.toProfile());
@@ -68,30 +71,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [service]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await serviceRef.current!.logIn({ email, password });
-    const errors = toFieldErrors(result);
-    if (result.ok) {
-      setUser(result.value.toProfile());
-    }
-    return { ok: result.ok, errors };
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const result = await service.logIn({ email, password });
+      const errors = toFieldErrors(result);
+      if (result.ok) {
+        setUser(result.value.toProfile());
+      }
+      return { ok: result.ok, errors };
+    },
+    [service],
+  );
 
-  const signup = useCallback(async (name: string, email: string, password: string) => {
-    const result = await serviceRef.current!.signUp({ name, email, password });
-    const errors = toFieldErrors(result);
-    if (result.ok) {
-      setUser(result.value.toProfile());
-    }
-    return { ok: result.ok, errors };
-  }, []);
+  const signup = useCallback(
+    async (name: string, email: string, password: string) => {
+      const result = await service.signUp({ name, email, password });
+      const errors = toFieldErrors(result);
+      if (result.ok) {
+        setUser(result.value.toProfile());
+      }
+      return { ok: result.ok, errors };
+    },
+    [service],
+  );
 
   const logout = useCallback(async () => {
-    await serviceRef.current!.logOut();
+    await service.logOut();
     setUser(null);
-  }, []);
+  }, [service]);
 
   const value = useMemo(
     () => ({ user, isLoading, login, signup, logout }),

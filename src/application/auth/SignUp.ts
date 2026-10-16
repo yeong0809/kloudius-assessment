@@ -36,8 +36,9 @@ export class SignUp {
       return failure('invalid-email', 'email');
     }
 
-    if (!validatePassword(input.password).valid) {
-      return failure('weak-password', 'password');
+    const passwordProblem = validatePassword(input.password);
+    if (passwordProblem) {
+      return failure(passwordProblem, 'password');
     }
 
     if (await this.users.findByEmail(email)) {

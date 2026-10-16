@@ -10,10 +10,10 @@ self-contained and runnable without a server, and it is what the assignment call
 
 ## Screens
 
-| Login | Signup | Home |
-|---|---|---|
-| Email and password, inline errors | Name, email, password | The signed-in user's name and email |
-| Errors for malformed email and bad credentials | Errors for missing fields, malformed email, short password | Logout returns to Login |
+| Login | Signup (error state) | Home |
+|:---:|:---:|:---:|
+| <img src="docs/login.png" width="230" alt="Login screen with email and password fields"> | <img src="docs/signup-error.png" width="230" alt="Signup screen showing a password length validation error"> | <img src="docs/home.png" width="230" alt="Home screen showing the signed in user's name and email"> |
+| Email and password, with inline errors for a malformed email or bad credentials. | Name, email, and password, with errors for missing fields, a malformed email, and a password under 6 characters. | The signed-in user's name and email. Logout returns to Login. |
 
 The eye icon on both auth screens toggles password visibility (the assignment's bonus
 task).
@@ -60,6 +60,13 @@ npm run ios       # or: npm run android
 this project uses `react-native-screens`, `react-native-keychain`, and AsyncStorage. A
 build that fails to link them is almost always a missing `pod install`.
 
+`npm install` also runs `patch-package`, which applies
+[`patches/detox+20.51.4.patch`](patches/detox+20.51.4.patch). That one-line patch is what
+lets the E2E suite focus a device window on Xcode 27, where Apple replaced `Simulator.app`
+with DeviceHub — see [End-to-end tests](#end-to-end-tests). If you install with
+`--ignore-scripts`, apply it yourself with `npx patch-package` or the E2E suite will still
+pass, just without a visible window.
+
 ### If the iOS build fails
 
 Both issues below are already handled in [`ios/Podfile`](ios/Podfile); they are listed here
@@ -104,7 +111,9 @@ Three things the domain layer makes structurally guaranteed:
 
 `AuthContext` holds React state and delegates to the `AuthService` use cases — it is the
 assignment's context, implemented as a presentation adapter rather than as the place the
-rules live.
+rules live. The service is passed in as a prop from [`App.tsx`](App.tsx), which is the
+composition root: `AuthContext` reaches no further than `application`, and never names an
+adapter.
 
 **Auth state drives navigation.** `RootNavigator` renders Login/Signup when there is no
 user and Home when there is, so `logout()` returns to Login with no navigation call. It
@@ -155,7 +164,7 @@ Six Jest suites, 64 tests:
 |---|---|---|
 | `__tests__/domain.test.ts` | 11 | email validation and normalization, password policy, `User` |
 | `__tests__/application.test.ts` | 13 | every signup/login/logout failure path against in-memory repositories |
-| `__tests__/hashing.test.ts` | 12 | `Sha256PasswordHasher` — determinism, salt separation, delimiter, verify |
+| `__tests__/hashing.test.ts` | 13 | `Sha256PasswordHasher` — determinism, salt separation, delimiter, verify |
 | `__tests__/storage.test.ts` | 16 | Keychain and AsyncStorage adapters — round trips, normalization, corrupt data |
 | `__tests__/App.test.tsx` | 4 | signup → logout → login round trip against in-memory repositories |
 | `__tests__/persistence.test.tsx` | 7 | the same flows against the **real** AsyncStorage and Keychain adapters |
@@ -173,7 +182,7 @@ is ever written to either store.
 Other checks:
 
 ```sh
-npx tsc --noEmit
+npm run typecheck
 npm run lint
 ```
 
@@ -188,11 +197,44 @@ These require a machine with a desktop session — Detox needs to interact with 
 simulator, so they cannot run over plain SSH or in a headless CI container without a
 virtual display.
 
-> **Known state:** four of the six flows pass reliably here. The two that perform a full
-> signup → logout → login cycle in a single test are flaky on a loaded machine — one run
-> took 147 seconds — and time out waiting for the Home screen rather than reporting an app
-> defect. The individual steps they combine all pass on their own. Re-run them on an idle
-> machine before trusting the result.
+Three prerequisites are easy to miss:
+
+- **A Metro server must be running.** `e2e:build` produces a Debug binary, which loads its
+  JavaScript from `localhost:8081` at launch. Without `npm start`, the app boots to a red
+  screen and every flow fails on `waitFor('Welcome back')`. If another project holds port
+  8081, that project's dev server answers instead and the app fails the same way.
+- **Password AutoFill must be off in the simulator.** iOS raises a **"Use Strong
+  Password?"** sheet the instant an empty password field takes focus, and a **"Save
+  Password?"** sheet once a signup succeeds. Both are SpringBoard UI, so Detox can neither
+  see nor dismiss them, and they sit on top of the submit and logout buttons — taps land on
+  the sheet and fail with "View is not hittable". Detox has no API for this
+  ([wix/Detox#3761](https://github.com/wix/Detox/issues/3761)), so
+  [`e2e/auth.e2e.js`](e2e/auth.e2e.js) turns AutoFill off in the simulator's configuration
+  profiles in `beforeAll`. The manual equivalent is Settings → General → AutoFill &
+  Passwords → AutoFill Passwords off.
+- **The machine must be otherwise idle.** Detox synchronizes on the app going quiet, so a
+  competing Xcode build starves the JS thread and the suite fails on timeouts rather than on
+  behaviour. A full run is around 2–3 minutes on an idle machine.
+
+The submit and logout buttons are only reachable at all because `KeyboardAvoidingView` on
+each screen keeps them above the software keyboard that `replaceText` leaves open.
+
+> **Watching it run:** Detox drives the simulator headed by default, so the interaction is
+> visible whenever the device window is attached. On **Xcode 27**, `Simulator.app` is gone —
+> Apple replaced it with `DeviceHub`. Detox still runs `open -a Simulator` to focus the
+> device
+> ([wix/Detox#4978](https://github.com/wix/Detox/issues/4978)); the failure is only logged as
+> a warning and does not affect results, but it does mean no window is raised. `open -a
+> DeviceHub --args -CurrentDeviceUDID <udid>` does the same job, so
+> [`patches/detox+20.51.4.patch`](patches/detox+20.51.4.patch) makes
+> `_openSimulatorApp` fall back to it. The patch is applied by `patch-package` on
+> `postinstall`, so `npm install` keeps it — drop the `patches/` directory to go back to
+> stock Detox. If you only want a recording rather than a live window, use
+> `--record-videos all` instead.
+
+> **Known state:** all six flows pass on an idle machine (verified twice, back to back).
+> Under heavy competing load the two multi-step flows can still time out — that is machine
+> speed, not an app defect. Re-run before trusting a failure.
 
 ## Implementation notes
 

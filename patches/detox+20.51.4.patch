@@ -1,0 +1,22 @@
+diff --git a/node_modules/detox/src/devices/common/drivers/ios/tools/AppleSimUtils.js b/node_modules/detox/src/devices/common/drivers/ios/tools/AppleSimUtils.js
+index e722f16..c8f7b8f 100644
+--- a/node_modules/detox/src/devices/common/drivers/ios/tools/AppleSimUtils.js
++++ b/node_modules/detox/src/devices/common/drivers/ios/tools/AppleSimUtils.js
+@@ -190,10 +190,16 @@ class AppleSimUtils {
+   }
+ 
+   async _openSimulatorApp(udid) {
++    // Xcode 27 replaces Simulator.app with DeviceHub (wix/Detox#4978). Try the old app
++    // first for older Xcode, then fall back to DeviceHub so the device window is focused.
+     try {
+       await childProcess.execWithRetriesAndLogs(`open -a Simulator --args -CurrentDeviceUDID ${udid}`, { retries: 0 });
+     } catch (error) {
+-      this._logUnableToOpenSimulator();
++      try {
++        await childProcess.execWithRetriesAndLogs(`open -a DeviceHub --args -CurrentDeviceUDID ${udid}`, { retries: 0 });
++      } catch (deviceHubError) {
++        this._logUnableToOpenSimulator();
++      }
+     }
+   }
+ 

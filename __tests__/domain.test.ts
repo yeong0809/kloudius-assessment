@@ -25,22 +25,22 @@ describe('EmailAddress', () => {
 });
 
 describe('validatePassword', () => {
-  it('rejects an empty password', () => {
-    expect(validatePassword('').valid).toBe(false);
+  it('reports a missing password as a missing field', () => {
+    expect(validatePassword('')).toBe('missing-fields');
   });
 
-  it('rejects one below the minimum', () => {
+  it('reports one below the minimum as too weak', () => {
     const password = 'a'.repeat(MIN_PASSWORD_LENGTH - 1);
-    expect(validatePassword(password).valid).toBe(false);
+    expect(validatePassword(password)).toBe('weak-password');
   });
 
   it('accepts exactly the minimum', () => {
     const password = 'a'.repeat(MIN_PASSWORD_LENGTH);
-    expect(validatePassword(password).valid).toBe(true);
+    expect(validatePassword(password)).toBeNull();
   });
 
   it('accepts a longer password', () => {
-    expect(validatePassword('a'.repeat(20)).valid).toBe(true);
+    expect(validatePassword('a'.repeat(20))).toBeNull();
   });
 });
 
